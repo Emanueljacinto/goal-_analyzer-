@@ -1,25 +1,457 @@
-   r.bombs.join(", ")+"<br>";
-  const btn=document.createElement("button");
-  btn.className="small";
-  btn.textContent="Apagar esta partida";
-  btn.onclick=()=>removeRound(i);
-  d.appendChild(btn);
-  history.appendChild(d);
- });
+
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Goal Analyzer</title>
+
+<style>
+* {
+  box-sizing: border-box;
 }
 
-function escapeText(s){
- const d=document.createElement("div");
- d.textContent=String(s);
- return d.innerHTML;
+body {
+  margin: 0;
+  padding: 16px;
+  background: #101827;
+  color: white;
+  font-family: Arial, sans-serif;
 }
 
-drawGrid();
-render();
+.container {
+  max-width: 600px;
+  margin: auto;
+}
+
+h1 {
+  text-align: center;
+  color: #35e58b;
+}
+
+.subtitulo {
+  text-align: center;
+  color: #cbd5e1;
+}
+
+.card {
+  background: #1e293b;
+  padding: 16px;
+  border-radius: 12px;
+  margin: 15px 0;
+}
+
+label {
+  display: block;
+  margin-bottom: 8px;
+}
+
+select, button {
+  padding: 12px;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+}
+
+select {
+  width: 100%;
+  background: #334155;
+  color: white;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 7px;
+  margin-top: 15px;
+}
+
+.casa {
+  aspect-ratio: 1;
+  border-radius: 8px;
+  background: #334155;
+  color: white;
+  font-weight: bold;
+  cursor: pointer;
+  padding: 0;
+}
+
+.casa.selecionada {
+  background: #e63946;
+}
+
+.casa.frequente {
+  outline: 2px solid #35e58b;
+}
+
+.botoes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 15px;
+}
+
+button {
+  cursor: pointer;
+  font-weight: bold;
+}
+
+.guardar {
+  background: #35e58b;
+  color: #102017;
+}
+
+.limpar {
+  background: #475569;
+  color: white;
+}
+
+.aviso {
+  font-size: 13px;
+  line-height: 1.5;
+  color: #cbd5e1;
+}
+
+.resultado {
+  background: #0f172a;
+  padding: 12px;
+  border-radius: 8px;
+  margin-top: 12px;
+}
+
+.item-historico {
+  padding: 12px 0;
+  border-bottom: 1px solid #475569;
+  overflow-wrap: anywhere;
+}
+
+.apagar {
+  margin-top: 8px;
+  background: #dc3545;
+  color: white;
+  font-size: 13px;
+}
+
+.pequeno {
+  color: #cbd5e1;
+  font-size: 13px;
+}
+</style>
+</head>
+
+<body>
+<div class="container">
+
+<h1>⚽ Goal Analyzer</h1>
+<p class="subtitulo">Análise estatística de partidas</p>
+
+<div class="card">
+  <h2>Registar partida</h2>
+
+  <label for="bombas">Quantidade de bombas nesta partida:</label>
+  <select id="bombas">
+    <option value="1">1 bomba</option>
+    <option value="2">2 bombas</option>
+    <option value="3">3 bombas</option>
+    <option value="4">4 bombas</option>
+    <option value="5">5 bombas</option>
+    <option value="6">6 bombas</option>
+    <option value="7" selected>7 bombas</option>
+    <option value="8">8 bombas</option>
+    <option value="9">9 bombas</option>
+    <option value="10">10 bombas</option>
+  </select>
+
+  <p class="aviso">
+    Toca nas casas que foram bombas na partida que já terminou.
+    A grelha contém 28 casas, organizadas em 4 linhas e 7 colunas.
+  </p>
+
+  <div class="grid" id="grelha"></div>
+
+  <div id="contador" class="resultado">
+    Casas seleccionadas: 0
+  </div>
+
+  <div class="botoes">
+    <button class="guardar" id="guardar">Guardar partida</button>
+    <button class="limpar" id="limpar">Limpar selecção</button>
+  </div>
+</div>
+
+<div class="card">
+  <h2>📊 Estatísticas</h2>
+  <div id="estatisticas">Ainda não existem partidas registadas.</div>
+</div>
+
+<div class="card">
+  <h2>📝 Histórico</h2>
+  <button class="limpar" id="exportar">Exportar histórico</button>
+  <button class="limpar" id="apagarTudo">Apagar todo o histórico</button>
+  <div id="historico"></div>
+</div>
+
+<div class="card">
+  <h3>ℹ️ Como funciona</h3>
+  <p class="aviso">
+    Este site regista resultados anteriores e calcula a frequência
+    com que cada casa foi marcada como bomba no histórico guardado
+    neste navegador.
+  </p>
+  <p class="aviso">
+    As frequências são apenas estatísticas do passado. Não prevêem
+    as próximas bombas nem garantem ganhos. Os resultados futuros
+    podem ser diferentes.
+  </p>
+</div>
+
+</div>
+
+<script>
+const TOTAL_CASAS = 28;
+
+let selecionadas = new Set();
+let partidas = [];
+
+try {
+  partidas = JSON.parse(
+    localStorage.getItem("goalAnalyzerPartidas") || "[]"
+  );
+
+  if (!Array.isArray(partidas)) {
+    partidas = [];
+  }
+} catch (e) {
+  partidas = [];
+}
+
+const grelha = document.getElementById("grelha");
+const contador = document.getElementById("contador");
+const bombasSelect = document.getElementById("bombas");
+const estatisticas = document.getElementById("estatisticas");
+const historico = document.getElementById("historico");
+
+function criarGrelha() {
+  grelha.innerHTML = "";
+
+  for (let i = 0; i < TOTAL_CASAS; i++) {
+    const botao = document.createElement("button");
+
+    botao.className = "casa";
+    botao.textContent = i + 1;
+    botao.type = "button";
+    botao.setAttribute("aria-label", "Casa " + (i + 1));
+
+    botao.addEventListener("click", () => {
+      if (selecionadas.has(i)) {
+        selecionadas.delete(i);
+      } else {
+        selecionadas.add(i);
+      }
+
+      atualizarGrelha();
+    });
+
+    grelha.appendChild(botao);
+  }
+}
+
+function atualizarGrelha() {
+  const casas = grelha.querySelectorAll(".casa");
+
+  casas.forEach((casa, i) => {
+    casa.classList.toggle("selecionada", selecionadas.has(i));
+  });
+
+  contador.textContent =
+    "Casas seleccionadas: " + selecionadas.size +
+    " de " + bombasSelect.value;
+
+  contador.style.color =
+    selecionadas.size === Number(bombasSelect.value)
+      ? "#35e58b"
+      : "white";
+}
+
+function guardarPartida() {
+  const quantidade = Number(bombasSelect.value);
+
+  if (selecionadas.size !== quantidade) {
+    alert(
+      "Seleccionaste " + selecionadas.size +
+      " casas, mas escolheste " + quantidade +
+      " bombas. Marca a quantidade correcta."
+    );
+    return;
+  }
+
+  const partida = {
+    data: new Date().toLocaleString("pt-PT"),
+    bombas: Array.from(selecionadas).sort((a, b) => a - b),
+    quantidade: quantidade
+  };
+
+  partidas.unshift(partida);
+
+  try {
+    localStorage.setItem(
+      "goalAnalyzerPartidas",
+      JSON.stringify(partidas)
+    );
+  } catch (e) {
+    partidas.shift();
+    alert("Não foi possível guardar. Verifica o espaço disponível.");
+    return;
+  }
+
+  selecionadas.clear();
+  atualizarGrelha();
+  mostrarResultados();
+
+  alert("Partida guardada com sucesso!");
+}
+
+function calcularFrequencias() {
+  const frequencias = Array(TOTAL_CASAS).fill(0);
+
+  partidas.forEach(partida => {
+    partida.bombas.forEach(numero => {
+      if (numero >= 0 && numero < TOTAL_CASAS) {
+        frequencias[numero]++;
+      }
+    });
+  });
+
+  return frequencias;
+}
+
+function mostrarResultados() {
+  const frequencias = calcularFrequencias();
+  const total = partidas.length;
+
+  if (total === 0) {
+    estatisticas.textContent =
+      "Ainda não existem partidas registadas.";
+    historico.innerHTML = "";
+    return;
+  }
+
+  const totalBombas = partidas.reduce(
+    (soma, partida) => soma + partida.bombas.length,
+    0
+  );
+
+  estatisticas.innerHTML = `
+    <div class="resultado">
+      <strong>Partidas registadas:</strong> ${total}<br><br>
+      <strong>Bombas registadas:</strong> ${totalBombas}<br><br>
+      <strong>Frequência:</strong> número de vezes que cada casa
+      apareceu como bomba nas partidas guardadas.
+    </div>
+  `;
+
+  const casas = grelha.querySelectorAll(".casa");
+
+  casas.forEach((casa, i) => {
+    casa.classList.toggle(
+      "frequente",
+      frequencias[i] > 0
+    );
+
+    casa.title =
+      "Casa " + (i + 1) + ": " +
+      frequencias[i] + " ocorrência(s) em " + total + " partida(s)";
+  });
+
+  historico.innerHTML = "";
+
+  partidas.forEach((partida, indice) => {
+    const item = document.createElement("div");
+    item.className = "item-historico";
+
+    const titulo = document.createElement("strong");
+    titulo.textContent = "Partida " + (total - indice);
+
+    const data = document.createElement("p");
+    data.className = "pequeno";
+    data.textContent = partida.data;
+
+    const numeros = document.createElement("p");
+    numeros.textContent =
+      "Casas marcadas como bombas: " +
+      partida.bombas.map(n => n + 1).join(", ");
+
+    const apagar = document.createElement("button");
+    apagar.className = "apagar";
+    apagar.textContent = "Apagar esta partida";
+
+    apagar.addEventListener("click", () => {
+      if (confirm("Queres apagar esta partida do histórico?")) {
+        partidas.splice(indice, 1);
+        guardarHistorico();
+        mostrarResultados();
+      }
+    });
+
+    item.appendChild(titulo);
+    item.appendChild(data);
+    item.appendChild(numeros);
+    item.appendChild(apagar);
+
+    historico.appendChild(item);
+  });
+}
+
+function guardarHistorico() {
+  try {
+    localStorage.setItem(
+      "goalAnalyzerPartidas",
+      JSON.stringify(partidas)
+    );
+  } catch (e) {
+    alert("Não foi possível guardar o histórico.");
+  }
+}
+
+document.getElementById("guardar").addEventListener(
+  "click",
+  guardarPartida
+);
+
+document.getElementById("limpar").addEventListener("click", () => {
+  selecionadas.clear();
+  atualizarGrelha();
+});
+
+document.getElementById("apagarTudo").addEventListener("click", () => {
+  if (confirm("Tens a certeza de que queres apagar todo o histórico?")) {
+    partidas = [];
+    guardarHistorico();
+    mostrarResultados();
+  }
+});
+
+document.getElementById("exportar").addEventListener("click", () => {
+  const ficheiro = new Blob(
+    [JSON.stringify(partidas, null, 2)],
+    { type: "application/json" }
+  );
+
+  const url = URL.createObjectURL(ficheiro);
+  const link = document.createElement("a");
+
+  link.href = url;
+  link.download = "historico-goal-analyzer.json";
+  link.click();
+
+  URL.revokeObjectURL(url);
+});
+
+bombasSelect.addEventListener("change", atualizarGrelha);
+
+criarGrelha();
+atualizarGrelha();
+mostrarResultados();
 </script>
 </body>
 </html>
-Boa, mano! 💪🔥 Agora vamos colocar o código do teu Goal Analyzer.
-📌 PASSO 2 — Copia o código
-Toca na área branca do GitHub e cola todo o código abaixo. Ele cria um analisador de resultados anteriores, guarda o histórico no teu telemóvel e mostra as frequências das casas marcadas como bombas. Não prevê onde estarão as próximas bombas.
-HTML
