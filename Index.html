@@ -1,0 +1,25 @@
+   r.bombs.join(", ")+"<br>";
+  const btn=document.createElement("button");
+  btn.className="small";
+  btn.textContent="Apagar esta partida";
+  btn.onclick=()=>removeRound(i);
+  d.appendChild(btn);
+  history.appendChild(d);
+ });
+}
+
+function escapeText(s){
+ const d=document.createElement("div");
+ d.textContent=String(s);
+ return d.innerHTML;
+}
+
+drawGrid();
+render();
+</script>
+</body>
+</html>
+Boa, mano! 💪🔥 Agora vamos colocar o código do teu Goal Analyzer.
+📌 PASSO 2 — Copia o código
+Toca na área branca do GitHub e cola todo o código abaixo. Ele cria um analisador de resultados anteriores, guarda o histórico no teu telemóvel e mostra as frequências das casas marcadas como bombas. Não prevê onde estarão as próximas bombas.
+HTML
